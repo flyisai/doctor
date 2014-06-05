@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <link rel="stylesheet" href="bootstrap.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>DOCTOR!!!</h1>
+        <div class="page"></div>
+    </div>
+
+    <script src="underscore.js"></script>
+    <script src="jquery.min.js"></script>
+    <script src="backbone.js"></script>
+
+    <script type="text/templete" id="home-templete">
+        <form class="find-your-doctor">
+            <legend>FIND YOUR DOCTOR</legend>
+            <input type="text" name="Hospital" placeholder="Name/Clinic/Hospital" />
+            <br />
+            <select name="Specialty" placeholder="Specialty">
+                <option value="Psychologist">Psychologist</option>
+                <option value="Dentist">Dentist</option>
+                <option value="Dermatologist">Dermatologist</option>
+                <option value="Allergy & Immunology">Allergy & Immunology</option>
+                <option value="Anesthesia">Anesthesia</option>
+            </select>
+            <br />
+            <input type="text" name="Location" placeholder="City/Landmark/PostCode"/>
+            <br />
+            <input type="checkbox"/>near by
+            <input type="text" style="width: 40px" name="Distance" />km
+            <hr />
+            <button type="submit" class="btn btn-primary">Find Doctor</button>
+        </form>
+    </script>
+
+    <script type="text/template" id="doctor-template">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Hospital</th>
+                    <th>Address</th>
+                    <th>Detail</th>
+                </tr>
+            </thead>
+                <% _.each(doctors, function(doctor) {
+                    doctor.id = new UUID();
+                %>
+                    <tr>
+                        <td><%= doctor.get('name') %></td>
+                        <td><%= doctor.get('hospital') %></td>
+                        <td><%= doctor.get('address') %></td>
+                        <td><a href="#/detail/<%= doctor.id %>" class="btn">Detail</a></td>
+                    </tr>
+                <% }); %>
+            <tbody>
+            </tbody>
+        </table>
+        <hr />
+        <button class="btn btn-primary back">Back</button>
+    </script>
+
+    <script type="text/template" id="doctor-detail">
+        <p>page not exist</p>
+    </script>
+
+    <script>
+
+        $.ajaxPrefilter(function(options){
+            options.url = 'http://10.200.1.200/edward/backbone/' + options.url;
+        });
+
+        $.fn.serializeObj = function serializeObj(){
+            var serializeObj = {};
+            var array = this.serializeArray();
+            $(array).each(function(){
+                if(serializeObj[this.name]){
+                    if($.isArray(serializeObj[this.name])){
+                        serializeObj[this.name].push(this.value);
+                    } else {
+                        serializeObj[this.name] = [serializeObj[this.name],this.value]
+                    }
+                } else {
+                    serializeObj[this.name] = this.value;
+                }
+            });
+            return serializeObj;
+        };
+
+        function handleURL(url){
+            var arr = url.split('&');
+            var result = {};
+            for(var i = 0; i < arr.length; i++){
+                var index = arr[i].indexOf('=');
+                var key = arr[i].substring(0,index);
+                result[key] = arr[i].substring(index+1);
+            }
+            return result;
+        }
+
+        var Doctor = Backbone.Model.extend({
+            urlRoot: '/php/doctor.php'
+        });
+
+        var Doctors = Backbone.Collection.extend({
+            url: '/php/doctor.php'
+        });
+
+        var UserList = Backbone.View.extend({
+           el: ".page",
+            render: function(){
+                var searchInfo;
+                var index = window.location.href.indexOf('?');
+                index == -1 ? searchInfo = null : searchInfo = handleURL(window.location.href.substring(index+1));
+
+                if(index == -1){
+                    var template = _.template($('#home-templete').html());
+                    this.$el.html(template);
+                }
+                else {
+                    var doctors = new Doctors();
+                    var that = this;
+                    doctors.fetch({
+                        type: 'POST',
+                        data: $.param(searchInfo),
+                        success: function(data){
+                            console.log(data);
+                            var template = _.template($('#doctor-template').html(),{doctors:data.models});
+                            that.$el.html(template);
+                        },
+                        error: function(){
+                            console.log('fail')
+                        }
+                    });
+                }
+            },
+            events: {
+                'click .back': 'back'
+            },
+            back:function(){
+                window.location.href="http://10.200.1.200/edward/backbone";
+            }
+        });
+
+        var DoctorDetail = Backbone.View.extend({
+            el: '.page',
+            render: function(options){
+                /*var doctor = new Doctor({id: options.id});
+                doctor.fetch({
+                    type: 'POST',
+                    success: function(detail){
+                        console.log(detail);
+                    }
+                });*/
+                var template = _.template($('#doctor-detail').html());
+                this.$el.html(template);
+            }
+        });
+
+        var Router = Backbone.Router.extend({
+
+            routes: {
+                '': 'home',
+                'detail/:id': 'detail'
+            },
+
+            home: function() {
+                userList.render();
+            },
+
+            detail: function(id) {
+                var doctor = new DoctorDetail();
+                doctor.render({id:id});
+                doctor = null;
+            }
+
+        });
+
+        var userList = new UserList();
+        var router = new Router();
+        Backbone.history.start();
+
+        function UUID(){this.id=this.createUUID()}UUID.prototype.valueOf=function(){return this.id};UUID.prototype.toString=function(){return this.id};UUID.prototype.createUUID=function(){var c=new Date(1582,10,15,0,0,0,0);var f=new Date();var h=f.getTime()-c.getTime();var i=UUID.getIntegerBits(h,0,31);var g=UUID.getIntegerBits(h,32,47);var e=UUID.getIntegerBits(h,48,59)+"2";var b=UUID.getIntegerBits(UUID.rand(4095),0,7);var d=UUID.getIntegerBits(UUID.rand(4095),0,7);var a=UUID.getIntegerBits(UUID.rand(8191),0,7)+UUID.getIntegerBits(UUID.rand(8191),8,15)+UUID.getIntegerBits(UUID.rand(8191),0,7)+UUID.getIntegerBits(UUID.rand(8191),8,15)+UUID.getIntegerBits(UUID.rand(8191),0,15);return i+g+e+b+d+a};UUID.getIntegerBits=function(f,g,b){var a=UUID.returnBase(f,16);var d=new Array();var e="";var c=0;for(c=0;c<a.length;c++){d.push(a.substring(c,c+1))}for(c=Math.floor(g/4);c<=Math.floor(b/4);c++){if(!d[c]||d[c]==""){e+="0"}else{e+=d[c]}}return e};UUID.returnBase=function(c,d){var e=["0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];if(c<d){var b=e[c]}else{var f=""+Math.floor(c/d);var a=c-f*d;if(f>=d){var b=this.returnBase(f,d)+e[a]}else{var b=e[f]+e[a]}}return b};UUID.rand=function(a){return Math.floor(Math.random()*a)};
+
+    </script>
+</body>
+</html>
